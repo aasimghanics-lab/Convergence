@@ -1,0 +1,52 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: skygrid
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: control
+  namespace: skygrid
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: control}}
+  template:
+    metadata: {labels: {app: control}}
+    spec:
+      containers:
+        - name: control
+          image: ghcr.io/aasimghanics-lab/skygrid-control:latest
+          ports: [{containerPort: 7000}, {containerPort: 8080}]
+          env: [{name: DATA_DIR, value: /data}]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: control
+  namespace: skygrid
+spec:
+  selector: {app: control}
+  ports:
+    - {name: shard, port: 7000, targetPort: 7000}
+    - {name: http, port: 8080, targetPort: 8080}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shard-central
+  namespace: skygrid
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: shard-central}}
+  template:
+    metadata: {labels: {app: shard-central}}
+    spec:
+      containers:
+        - name: simulator
+          image: ghcr.io/aasimghanics-lab/skygrid-simulator:latest
+          env:
+            - {name: SHARD_ID, value: central}
+            - {name: CONTROL_HOST, value: control}
+            - {name: CONTROL_PORT, value: "7000"}
+            - {name: SEED_COUNT, value: "250"}

@@ -1,0 +1,72 @@
+services:
+  control:
+    build: ./control
+    environment:
+      HTTP_PORT: "8080"
+      DATA_DIR: /data
+      SHARD_TIMEOUT: 4s
+    ports:
+      - "8080:8080"
+    volumes:
+      - skygrid-data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:8080/healthz"]
+      interval: 2s
+      timeout: 1s
+      retries: 20
+      start_period: 2s
+
+  shard-west:
+    build: ./simulator
+    environment:
+      SHARD_ID: west
+      CONTROL_HOST: control
+      CONTROL_PORT: "7000"
+      SEED_COUNT: "250"
+    depends_on:
+      control:
+        condition: service_healthy
+
+  shard-central:
+    build: ./simulator
+    environment:
+      SHARD_ID: central
+      CONTROL_HOST: control
+      CONTROL_PORT: "7000"
+      SEED_COUNT: "250"
+    depends_on:
+      control:
+        condition: service_healthy
+
+  shard-east:
+    build: ./simulator
+    environment:
+      SHARD_ID: east
+      CONTROL_HOST: control
+      CONTROL_PORT: "7000"
+      SEED_COUNT: "250"
+    depends_on:
+      control:
+        condition: service_healthy
+
+  web:
+    build: ./web
+    ports:
+      - "5173:5173"
+    depends_on:
+      control:
+        condition: service_healthy
+
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    command: ["--config.file=/etc/prometheus/prometheus.yml"]
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    depends_on:
+      control:
+        condition: service_healthy
+
+volumes:
+  skygrid-data:
